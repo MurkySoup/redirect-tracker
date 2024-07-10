@@ -3,23 +3,13 @@
 
 
 """
-URL Redirection Tracker, Version 0.7.1-alpha (do not distribute)
+URL Redirection Tracker, Version 0.7.3-alpha (do not distribute)
 By Rick Pelletier (galiagante@gmail.com), 04 July 2024
-Last updated: 05 July 2024
+Last updated: 10 July 2024
 
-Note: AI analysis and optimization has been applied this source code.
-
+Note: AI analysis and optimization has been applied tthis source code.
 
 Example usage and output:
-
-
-usage: redirect-tracker.py [-h] -u URL [-s]
-
-options:
-  -h, --help         show this help message and exit
-  -u URL, --url URL  Target URL
-  -s, --skip         Skip SSL Verification
-
 
 ./redirect-tracker.py -u "http://events.desmoinesregister.com/"
 
@@ -44,8 +34,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def resp_code_info(code:int):
     resp_code_info = [
-      { 'code_value': 100, 'text':'Continue', 'memo':'RFC9110'},
-      { 'code_value': 101, 'text':'Switching Protocols', 'memo':'RFC9110'},
+      { 'code_value': 100, 'text':'Continue', 'memo':'RFC 9110'},
+      { 'code_value': 101, 'text':'Switching Protocols', 'memo':'RFC 9110'},
       { 'code_value': 102, 'text':'Processing', 'memo':'WebDAV; RFC 2518'},
       { 'code_value': 103, 'text':'Early Hints', 'memo': 'RFC 8297'},
       { 'code_value': 110, 'text':'Response is Stale', 'memo':'Obsolete'},
@@ -53,56 +43,56 @@ def resp_code_info(code:int):
       { 'code_value': 112, 'text':'Disconnected Operation', 'memo':'Obsolete'},
       { 'code_value': 113, 'text':'Heuristic Expiration', 'memo':'Obsolete'},
       { 'code_value': 199, 'text':'Miscellaneous Warning', 'memo':'Obsolete'},
-      { 'code_value': 200, 'text':'OK', 'memo':'RFC9110'},
-      { 'code_value': 201, 'text':'Created', 'memo':'RFC9110'},
-      { 'code_value': 202, 'text':'Accepted', 'memo':'RFC9110'},
-      { 'code_value': 203, 'text':'Non-Authoritative Information (since HTTP/1.1)', 'memo':'RFC9110'},
-      { 'code_value': 204, 'text':'No Content', 'memo':'RFC9110'},
-      { 'code_value': 205, 'text':'Reset Content', 'memo':'RFC9110'},
-      { 'code_value': 206, 'text':'Partial Content', 'memo':'RFC9110'},
+      { 'code_value': 200, 'text':'OK', 'memo':'RFC 9110'},
+      { 'code_value': 201, 'text':'Created', 'memo':'RFC 9110'},
+      { 'code_value': 202, 'text':'Accepted', 'memo':'RFC 9110'},
+      { 'code_value': 203, 'text':'Non-Authoritative Information (since HTTP/1.1)', 'memo':'RFC 9110'},
+      { 'code_value': 204, 'text':'No Content', 'memo':'RFC 9110'},
+      { 'code_value': 205, 'text':'Reset Content', 'memo':'RFC 9110'},
+      { 'code_value': 206, 'text':'Partial Content', 'memo':'RFC 9110'},
       { 'code_value': 207, 'text':'Multi-Status', 'memo':'WebDAV; RFC 4918'},
       { 'code_value': 208, 'text':'Already Reported', 'memo':'WebDAV; RFC 5842'},
       { 'code_value': 214, 'text':'Transformation Applied', 'memo':'Obsolete'},
       { 'code_value': 218, 'text':'This is fine', 'memo':'Unofficial; Apache HTTP Server'},
       { 'code_value': 226, 'text':'IM Used', 'memo':'RFC 3229'},
       { 'code_value': 299, 'text':'Miscellaneous Persistent Warning', 'memo':'Obsolete'},
-      { 'code_value': 300, 'text':'Multiple Choices', 'memo':'RFC9110'},
-      { 'code_value': 301, 'text':'Moved Permanently or Forced SSL', 'memo':'RFC9110'},
-      { 'code_value': 302, 'text':'Found (Previously "Moved temporarily")', 'memo':'RFC9110'},
-      { 'code_value': 303, 'text':'See Other (since HTTP/1.1)', 'memo':'RFC9110'},
-      { 'code_value': 304, 'text':'Not Modified', 'memo':'RFC9110'},
-      { 'code_value': 305, 'text':'Use Proxy (since HTTP/1.1)', 'memo':'RFC9110, RFC7231'},
-      { 'code_value': 306, 'text':'Switch Proxy', 'memo':'RFC9110'},
-      { 'code_value': 307, 'text':'Temporary Redirect (since HTTP/1.1)', 'memo':'RFC9110'},
-      { 'code_value': 308, 'text':'Permanent Redirect', 'memo':'RFC9110, RFC7538'},
-      { 'code_value': 400, 'text':'Bad Request', 'memo':'RFC9110'},
-      { 'code_value': 401, 'text':'Unauthorized', 'memo':'RFC9110'},
-      { 'code_value': 402, 'text':'Payment Required', 'memo':'RFC9110'},
-      { 'code_value': 403, 'text':'Forbidden', 'memo':'RFC9110'},
-      { 'code_value': 404, 'text':'Not Found', 'memo':'RFC9110'},
-      { 'code_value': 405, 'text':'Method Not Allowed', 'memo':'RFC9110'},
-      { 'code_value': 406, 'text':'Not Acceptable', 'memo':'RFC9110'},
-      { 'code_value': 407, 'text':'Proxy Authentication Required', 'memo':'RFC9110'},
-      { 'code_value': 408, 'text':'Request Timeout', 'memo':'RFC9110'},
-      { 'code_value': 409, 'text':'Conflict', 'memo':'RFC9110'},
-      { 'code_value': 410, 'text':'Gone', 'memo':'RFC9110'},
-      { 'code_value': 411, 'text':'Length Required', 'memo':'RFC9110'},
-      { 'code_value': 412, 'text':'Precondition Failed', 'memo':'RFC9110'},
-      { 'code_value': 413, 'text':'Payload Too Large', 'memo':'RFC9110'},
-      { 'code_value': 414, 'text':'URI Too Long', 'memo':'RFC9110'},
-      { 'code_value': 415, 'text':'Unsupported Media Type', 'memo':'RFC9110'},
-      { 'code_value': 416, 'text':'Range Not Satisfiable', 'memo':'RFC9110'},
-      { 'code_value': 417, 'text':'Expectation Failed', 'memo':'RFC9110'},
+      { 'code_value': 300, 'text':'Multiple Choices', 'memo':'RFC 9110'},
+      { 'code_value': 301, 'text':'Moved Permanently or Forced SSL', 'memo':'RFC 9110'},
+      { 'code_value': 302, 'text':'Found (Previously "Moved temporarily")', 'memo':'RFC 9110'},
+      { 'code_value': 303, 'text':'See Other (since HTTP/1.1)', 'memo':'RFC 9110'},
+      { 'code_value': 304, 'text':'Not Modified', 'memo':'RFC 9110'},
+      { 'code_value': 305, 'text':'Use Proxy (since HTTP/1.1)', 'memo':'RFC 9110, RFC 7231'},
+      { 'code_value': 306, 'text':'Switch Proxy', 'memo':'RFC 9110'},
+      { 'code_value': 307, 'text':'Temporary Redirect (since HTTP/1.1)', 'memo':'RFC 9110'},
+      { 'code_value': 308, 'text':'Permanent Redirect', 'memo':'RFC 9110, RFC 7538'},
+      { 'code_value': 400, 'text':'Bad Request', 'memo':'RFC 9110'},
+      { 'code_value': 401, 'text':'Unauthorized', 'memo':'RFC 9110'},
+      { 'code_value': 402, 'text':'Payment Required', 'memo':'RFC 9110'},
+      { 'code_value': 403, 'text':'Forbidden', 'memo':'RFC 9110'},
+      { 'code_value': 404, 'text':'Not Found', 'memo':'RFC 9110'},
+      { 'code_value': 405, 'text':'Method Not Allowed', 'memo':'RFC 9110'},
+      { 'code_value': 406, 'text':'Not Acceptable', 'memo':'RFC 9110'},
+      { 'code_value': 407, 'text':'Proxy Authentication Required', 'memo':'RFC 9110'},
+      { 'code_value': 408, 'text':'Request Timeout', 'memo':'RFC 9110'},
+      { 'code_value': 409, 'text':'Conflict', 'memo':'RFC 9110'},
+      { 'code_value': 410, 'text':'Gone', 'memo':'RFC 9110'},
+      { 'code_value': 411, 'text':'Length Required', 'memo':'RFC 9110'},
+      { 'code_value': 412, 'text':'Precondition Failed', 'memo':'RFC 9110'},
+      { 'code_value': 413, 'text':'Payload Too Large', 'memo':'RFC 9110'},
+      { 'code_value': 414, 'text':'URI Too Long', 'memo':'RFC 9110'},
+      { 'code_value': 415, 'text':'Unsupported Media Type', 'memo':'RFC 9110'},
+      { 'code_value': 416, 'text':'Range Not Satisfiable', 'memo':'RFC 9110'},
+      { 'code_value': 417, 'text':'Expectation Failed', 'memo':'RFC 9110'},
       { 'code_value': 418, 'text':'I\'m a teapot', 'memo':'RFC 2324, RFC 7168'},
       { 'code_value': 419, 'text':'Page Expired', 'memo':'Unofficial; Laravel Framework'},
       { 'code_value': 420, 'text':'Enhance Your Calm', 'memo':'Unofficial; Twitter'},
       { 'code_value': 420, 'text':'Method Failure', 'memo':'Unofficial; Spring Framework'},
-      { 'code_value': 421, 'text':'Misdirected Request', 'memo':'RFC9110'},
-      { 'code_value': 422, 'text':'Unprocessable Content', 'memo':'RFC9110'},
+      { 'code_value': 421, 'text':'Misdirected Request', 'memo':'RFC 9110'},
+      { 'code_value': 422, 'text':'Unprocessable Content', 'memo':'RFC 9110'},
       { 'code_value': 423, 'text':'Locked', 'memo':'WebDAV; RFC 4918'},
       { 'code_value': 424, 'text':'Failed Dependency', 'memo':'WebDAV; RFC 4918'},
       { 'code_value': 425, 'text':'Too Early', 'memo':'RFC 8470'},
-      { 'code_value': 426, 'text':'Upgrade Required', 'memo':'RFC9110'},
+      { 'code_value': 426, 'text':'Upgrade Required', 'memo':'RFC 9110'},
       { 'code_value': 428, 'text':'Precondition Required', 'memo':'RFC 6585'},
       { 'code_value': 429, 'text':'Too Many Requests', 'memo':'RFC 6585'},
       { 'code_value': 430, 'text':'Request Header Fields Too Large', 'memo':'Unofficial; Shopify'},
@@ -121,12 +111,12 @@ def resp_code_info(code:int):
       { 'code_value': 498, 'text':'Invalid Token', 'memo':'Unofficial; Esri'},
       { 'code_value': 499, 'text':'Client Closed Request', 'memo':'Unofficial; NGinx'},
       { 'code_value': 499, 'text':'Token Required', 'memo':'Unofficial; Esri'},
-      { 'code_value': 500, 'text':'Internal Server Error', 'memo':'RFC9110'},
-      { 'code_value': 501, 'text':'Not Implemented', 'memo':'RFC9110'},
-      { 'code_value': 502, 'text':'Bad Gateway', 'memo':'RFC9110'},
-      { 'code_value': 503, 'text':'Service Unavailable', 'memo':'RFC9110'},
-      { 'code_value': 504, 'text':'Gateway Timeout', 'memo':'RFC9110'},
-      { 'code_value': 505, 'text':'HTTP Version Not Supported', 'memo':'RFC9110'},
+      { 'code_value': 500, 'text':'Internal Server Error', 'memo':'RFC 9110'},
+      { 'code_value': 501, 'text':'Not Implemented', 'memo':'RFC 9110'},
+      { 'code_value': 502, 'text':'Bad Gateway', 'memo':'RFC 9110'},
+      { 'code_value': 503, 'text':'Service Unavailable', 'memo':'RFC 9110'},
+      { 'code_value': 504, 'text':'Gateway Timeout', 'memo':'RFC 9110'},
+      { 'code_value': 505, 'text':'HTTP Version Not Supported', 'memo':'RFC 9110'},
       { 'code_value': 506, 'text':'Variant Also Negotiates', 'memo':'RFC 2295'},
       { 'code_value': 507, 'text':'Insufficient Storage', 'memo':'WebDAV; RFC 4918'},
       { 'code_value': 508, 'text':'Loop Detected', 'memo':'WebDAV; RFC 5842'},
@@ -168,7 +158,10 @@ def url_tracking(url, skip_flag):
             extra_data_string = f'{extra_data["text"]} ({extra_data["memo"]})'
             print(f'  {resp.url} -> {resp.status_code} {extra_data_string}')
 
-        print("Final URL:", response.url)
+        extra_data = resp_code_info(response.status_code)
+        extra_data_string = f'{extra_data["text"]} ({extra_data["memo"]})'
+        print(f'Final URL: {response.url} {response.status_code} {extra_data_string}')
+        #print(f'Final URL: {response.url} {response.status_code}')
 
         return True
 
