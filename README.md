@@ -36,7 +36,7 @@ Request was redirected
   http://events.desmoinesregister.com/ -> 301 Moved Permanently or Forced SSL (RFC 9110)
   http://thingstodo.desmoinesregister.com/events -> 301 Moved Permanently or Forced SSL (RFC 9110)
   http://www.desmoinesregister.com/things-to-do/best-lists/ -> 301 Moved Permanently or Forced SSL (RFC 9110)
-Final URL: https://www.desmoinesregister.com/things-to-do/best-lists/ 200 OK (RFC 9110)
+Final URL: https://www.desmoinesregister.com/things-to-do/best-lists/ -> 200 OK (RFC 9110)
 ```
 
 ## Built With
