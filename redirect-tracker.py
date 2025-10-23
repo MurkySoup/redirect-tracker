@@ -4,7 +4,7 @@
 """
 URL Redirection Tracker, Version 0.9-Beta (Do Not Distribute)
 By Rick Pelletier (galiagante@gmail.com), 04 July 2024
-Last updated: 23 October 2024
+Last updated: 23 October 2025
 
 Trace HTTP redirects for a given URL, detect HTTPS upgrades,
 and optionally emit structured JSON output. Includes header inspection,
