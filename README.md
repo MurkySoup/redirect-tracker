@@ -49,7 +49,7 @@ options:
   -r, --redact-headers  Redact sensitive headers (safe for sharing).
 ```
 
-Output can be test or JSON, can be trivially piped to a file, and includes the ability to redact an extensible list of "sensitive" headers:
+Output can be text or JSON, can be trivially piped to a file, and includes the ability to redact an extensible list of "sensitive" headers:
 * authorization
 * proxy-authorization
 * cookie
