@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 """
-URL Redirection Tracker, Version 1.0.1-Beta (Do Not Distribute)
+URL Redirection Tracker, Version 1.0.2-Beta (Do Not Distribute)
 By Rick Pelletier (galiagante@gmail.com), 04 July 2024
-Last updated: 24 October 2025
+Last updated: 25 October 2025
 
 Trace HTTP redirects for a given URL, detect HTTPS upgrades,
 and optionally emit structured JSON output. Includes header inspection,
@@ -49,8 +49,7 @@ class StatusInfo:
     """A small wrapper around HTTP status codes."""
 
     code: int
-    phrase: str
-    memo: str = "N/A"
+    code_msg: str
 
     @classmethod
     def from_code(cls, code: int) -> StatusInfo:
@@ -61,11 +60,11 @@ class StatusInfo:
 
         try:
             http_status = HTTPStatus(code)
-            phrase = http_status.phrase
+            code_msg = http_status.phrase
         except ValueError:
-            phrase = "Unknown Status"
+            code_msg = "Unknown Status"
 
-        return cls(code=code, phrase=phrase)
+        return cls(code=code, code_msg=code_msg)
 
 @dataclass(frozen=True)
 class RedirectEntry:
@@ -280,7 +279,7 @@ def print_human(result: TraceResult) -> None:
     else:
         print("Redirect chain:")
         for i, step in enumerate(result.redirects, 1):
-            print(f"{i}. {step.from_url} -> {step.status.code} {step.status.phrase}")
+            print(f"{i}. {step.from_url} -> {step.status.code} {step.status.code_msg}")
             print(f"   ↳ {step.to_url}\n")
             print(f"   Request headers: {json.dumps(step.request_headers, indent=2)}\n")
             print(f"   Response headers: {json.dumps(step.response_headers, indent=2)}\n")
@@ -288,7 +287,7 @@ def print_human(result: TraceResult) -> None:
     if result.final_status:
         print(
             f"Final URL: {result.final_url} -> "
-            f"{result.final_status.code} {result.final_status.phrase}\n"
+            f"{result.final_status.code} {result.final_status.code_msg}\n"
         )
 
     if result.final_headers:
