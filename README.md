@@ -1,5 +1,5 @@
 # redirect-tracker
-Show URL Redirection Sequence, Response Codes and Other Data
+Show URL redirection sequence, protocol upgrade/downgrade events, response codes and other data.
 
 ## Description
 
@@ -14,6 +14,7 @@ This utility is intended to be transparent and audit-friendly, adhering to the f
 Features:
 - Full redirect chain tracing: Displays every hop from initial request to final destination.
 - HTTPS upgrade verification: Warns when No upgrade from HTTP → HTTPS occurred, or when HTTPS upgrade occurred after the first redirect (suboptimal).
+- HTTPS downgrade detection: Warns when protocol is reverted to HTTP after an HTTPS upgrade.
 - HTTP header inspection: View headers for each step and the final response.
 - Optional header redaction: Safely mask sensitive values.
 - Machine-readable JSON output: Ideal for automated checks and security audits.
@@ -37,19 +38,20 @@ Requires Python 3.x (preferrably 3.11+) and uses the following libraries:
 Clone this repo and run this one script contained within. There is no setup, installation or interconnect to anything else-- it's a self-contained program. A simple command line interface is present:
 
 ```
-usage: redirect-tracker.py [-h] -u URL [-k] [-j] [-r]
+usage: redirect-tracker.py [-h] -u URL [-k] [-j] [-r] [-t TIMEOUT]
 
 Trace HTTP redirects for a given URL.
 
 options:
-  -h, --help            show this help message and exit
-  -u URL, --url URL     Target URL to trace.
-  -k, --insecure        Skip SSL certificate verification (insecure).
-  -j, --json            Output results in JSON format.
-  -r, --redact-headers  Redact sensitive headers (safe for sharing).
+  -h, --help                     show this help message and exit
+  -u URL, --url URL              Target URL to trace.
+  -k, --insecure                 Skip SSL certificate verification (insecure).
+  -j, --json                     Output results in JSON format.
+  -r, --redact-headers           Redact sensitive headers (safe for sharing).
+  -t TIMEOUT, --timeout TIMEOUT  Request timeout in seconds (default: 10.0).
 ```
 
-Output can be text or JSON, can be trivially piped to a file, and includes the ability to redact an extensible list of "sensitive" headers:
+Output can be test or JSON, can be trivially piped to a file, and includes the ability to redact an easily-extensible list of "sensitive" headers:
 * authorization
 * proxy-authorization
 * cookie
@@ -58,6 +60,28 @@ Output can be text or JSON, can be trivially piped to a file, and includes the a
 * x-xsrf-token
 * x-api-key
 * x-auth-token
+
+Analysis of results is relatively easy, especially of data output is in JSON format. Here are a few examples using 'jq':
+
+Show occurances of test failures (connection failures, etc.):
+```
+# jq 'select(.success==false) | {initial_url:.initial_url,warnings:.warnings}' results.json
+```
+
+Show occurances of HTTP->HTTPS upgrade failed/did not happen:
+```
+# jq 'select(.success==true) | select(.https_upgrade==false) | {initial_url:.initial_url,http_upgrade:.http_upgrade,warnings:.warnings}' results.json
+```
+
+Show occurances of incorrectly-sequenced HTTP->HTTPS upgrades (should be the first step):
+```
+# jq -r 'select(.success==true) | . as $root | if .warnings then .warnings[] | select(test("(?i)HTTPS upgrade occurred after the first redirect")) | $root.initial_url else empty end' results.json
+```
+
+Show occurances of HTTPS protocol downgrades:
+```
+# jq -r 'select(.success==true) | . as $root | if .warnings then .warnings[] | select(test("(?i)HTTP downgrade detected")) | $root.initial_url else empty end' results.json
+```
 
 ## Built With
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 """
-URL Redirection Tracker, Version 1.0.2-Beta (Do Not Distribute)
+URL Redirection Tracker, Version 1.1-Beta (Do Not Distribute)
 By Rick Pelletier (galiagante@gmail.com), 04 July 2024
-Last updated: 25 October 2025
+Last updated: 07 November 2025
 
-Trace HTTP redirects for a given URL, detect HTTPS upgrades,
+Trace HTTP redirects for a given URL, detect HTTPS upgrades and downgrades,
 and optionally emit structured JSON output. Includes header inspection,
 with optional redaction of sensitive header fields.
 
@@ -13,19 +13,9 @@ Example:
     python redirect_tracker.py -u "http://example.com"
     python redirect_tracker.py -u "http://example.com" --json
     python redirect_tracker.py -u "http://example.com" --json --redact-headers
+    python redirect_tracker.py -u "https://example.com" --downgrade-fatal
 
-Features:
-- Uses :mod:`http.HTTPStatus` for robust status‑code handling.
-- Explicit type hints and exhaustive docstrings.
-- All user‑facing data wrapped in immutable dataclasses.
-- No global state – the main logic is pure, making it trivial to unit‑test.
-- Explicit request timeout and optional SSL verification.
-- Output is available in human‑readable or JSON format.
-
-Potential future feature upgrades:
-- Timing metrics (per redirect and total elapsed time).
-- TLS details (protocol version, cipher suite, certificate issuer).
-- Custom output filters (e.g., only warnings, only redirect chain).
+Linter: ruff check redirect-tracker.py --extend-select F,B,UP
 """
 
 from __future__ import annotations
@@ -46,18 +36,13 @@ from urllib.parse import urlparse
 
 @dataclass(frozen=True)
 class StatusInfo:
-    """A small wrapper around HTTP status codes."""
-
+    """Holds HTTP status code information."""
     code: int
     code_msg: str
 
     @classmethod
     def from_code(cls, code: int) -> StatusInfo:
-        """
-        Construct a :class:`StatusInfo` from an integer status code.
-        Uses :class:`http.HTTPStatus` for the canonical phrase.
-        """
-
+        """Create a StatusInfo instance from a numeric code."""
         try:
             http_status = HTTPStatus(code)
             code_msg = http_status.phrase
@@ -68,8 +53,7 @@ class StatusInfo:
 
 @dataclass(frozen=True)
 class RedirectEntry:
-    """A record of a single redirect step."""
-
+    """Represents a single hop in a redirect chain."""
     from_url: str
     to_url: str
     status: StatusInfo
@@ -78,8 +62,7 @@ class RedirectEntry:
 
 @dataclass
 class TraceResult:
-    """Immutable container for the complete redirect trace."""
-
+    """Contains the full results of a redirect trace."""
     initial_url: str
     redirects: list[RedirectEntry] = field(default_factory=list)
     final_url: str | None = None
@@ -87,12 +70,13 @@ class TraceResult:
     final_headers: dict[str, str] | None = None
     https_upgrade: bool | None = None
     upgrade_step: int | None = None
+    https_downgrade: bool | None = None
+    downgrade_step: int | None = None
     warnings: list[str] = field(default_factory=list)
     success: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a serialisable dictionary representation."""
-
+        """Convert the result to a dictionary for JSON serialization."""
         return {
             "initial_url": self.initial_url,
             "redirects": [
@@ -110,6 +94,8 @@ class TraceResult:
             "final_headers": self.final_headers,
             "https_upgrade": self.https_upgrade,
             "upgrade_step": self.upgrade_step,
+            "https_downgrade": self.https_downgrade,
+            "downgrade_step": self.downgrade_step,
             "warnings": self.warnings,
             "success": self.success,
         }
@@ -118,7 +104,7 @@ class TraceResult:
 # Configuration
 # --------------------------------------------------------------------------- #
 
-# Headers that should be redacted when the user asks for it.
+# Extensible list of headers that should be redacted when the user asks for it.
 SENSITIVE_HEADERS = {
     "authorization",
     "proxy-authorization",
@@ -130,14 +116,17 @@ SENSITIVE_HEADERS = {
     "x-auth-token",
 }
 
-def redact_headers(
-    headers: Mapping[str, str], *, enabled: bool = False) -> dict[str, str]:
+def redact_headers(headers: Mapping[str, str], *, enabled: bool = False) -> dict[str, str]:
     """
-    Return a copy of *headers* with any sensitive keys replaced by ``<REDACTED>``.
-    The function is case‑insensitive – header names are normalised to lower‑case
-    for comparison.
-    """
+    Redact sensitive values from a dictionary of headers.
 
+    Args:
+        headers: The original request or response headers.
+        enabled: If True, redaction will be performed.
+
+    Returns:
+        A new dictionary of headers, potentially with redacted values.
+    """
     if not enabled:
         return dict(headers)
 
@@ -157,26 +146,17 @@ def redact_headers(
 
 def track_redirects(url: str, *, verify_ssl: bool = True, redact: bool = False, timeout: float = 10.0) -> TraceResult:
     """
-    Follow *url* until the final destination is reached, collecting
-    information about every redirect step.
+    Traces all HTTP redirects from a starting URL.
 
-    Parameters
-    ----------
-    url : str
-        Target URL.
-    verify_ssl : bool, optional
-        Whether to validate the server’s SSL certificate.
-    redact : bool, optional
-        Whether to replace sensitive headers with ``<REDACTED>``.
-    timeout : float, optional
-        Timeout (seconds) for each HTTP request.
+    Args:
+        url: The initial URL to trace.
+        verify_ssl: Whether to verify SSL certificates.
+        redact: Whether to redact sensitive headers in the output.
+        timeout: Request timeout in seconds.
 
-    Returns
-    -------
-    TraceResult
-        A data structure containing the entire trace.
+    Returns:
+        A TraceResult object containing the full chain and analysis.
     """
-
     result = TraceResult(initial_url=url)
 
     session = Session()
@@ -188,77 +168,89 @@ def track_redirects(url: str, *, verify_ssl: bool = True, redact: bool = False, 
             allow_redirects=True,
             timeout=timeout,
         )
-        response.raise_for_status()
+        # Note: We don't call raise_for_status() here, as a 4xx or 5xx
+        # is a valid final state for a redirect chain. We'll capture
+        # the final status code regardless.
     except requests.exceptions.RequestException as exc:
         result.warnings.append(f"Request failed: {exc}")
-
         return result  # success remains False
 
     # Helper to convert requests.Response into a RedirectEntry
-    def entry_from_resp(resp: Response, next_resp: Response | None = None) -> RedirectEntry:
-        next_url = next_resp.url if next_resp else resp.url
+    def entry_from_resp(resp: Response, next_resp: Response) -> RedirectEntry:
+        """Create a RedirectEntry from two adjacent responses in the chain."""
         status = StatusInfo.from_code(resp.status_code)
-
         return RedirectEntry(
             from_url=resp.url,
-            to_url=next_url,
+            to_url=next_resp.url,
             status=status,
             request_headers=redact_headers(resp.request.headers, enabled=redact),
             response_headers=redact_headers(resp.headers, enabled=redact),
         )
 
-    # No redirect case
-    if not response.history:
-        result.final_url = response.url
-        result.final_status = StatusInfo.from_code(response.status_code)
-        result.final_headers = redact_headers(response.headers, enabled=redact)
-        result.success = True
-
-        scheme = urlparse(url).scheme.lower()
-        result.https_upgrade = scheme == "https"
-
-        if not result.https_upgrade:
-            result.warnings.append(
-                "No HTTPS upgrade – the initial connection was over HTTP."
-            )
-
-        return result
-
-    # Build chain of RedirectEntry objects
+    # --- Final state processing ---
+    # The full chain is history (all but last) + response (last)
     chain = list(response.history) + [response]
-
-    for i, resp in enumerate(chain[:-1]):
-        result.redirects.append(entry_from_resp(resp, chain[i + 1]))
-
-    # Final target
     final_resp = chain[-1]
     result.final_url = final_resp.url
     result.final_status = StatusInfo.from_code(final_resp.status_code)
     result.final_headers = redact_headers(final_resp.headers, enabled=redact)
-    result.success = True
+    result.success = True # We got a final response
 
-    # HTTPS upgrade logic
+    # --- No redirect case ---
+    if not response.history:
+        result.https_upgrade = False
+        result.https_downgrade = False
+        scheme = urlparse(result.final_url).scheme.lower()
+        if scheme == "http":
+            result.warnings.append(
+                "No redirects – the connection remained over HTTP."
+            )
+        return result
+
+    # --- Redirect case ---
+
+    # Build chain of RedirectEntry objects
+    for i, resp in enumerate(chain[:-1]):
+        result.redirects.append(entry_from_resp(resp, chain[i + 1]))
+
+    # --- Security analysis (Upgrade / Downgrade) ---
+    result.https_upgrade = False
+    result.https_downgrade = False
+
+    found_upgrade = False
+    found_downgrade = False
+
+    for i in range(len(chain) - 1):
+        from_scheme = urlparse(chain[i].url).scheme.lower()
+        to_scheme = urlparse(chain[i+1].url).scheme.lower()
+
+        # Check for first upgrade
+        if from_scheme == "http" and to_scheme == "https" and not found_upgrade:
+            result.https_upgrade = True
+            result.upgrade_step = i
+            found_upgrade = True
+
+        # Check for first downgrade
+        if from_scheme == "https" and to_scheme == "http" and not found_downgrade:
+            result.https_downgrade = True
+            result.downgrade_step = i
+            found_downgrade = True
+
+    # --- Add contextual warnings ---
     initial_scheme = urlparse(chain[0].url).scheme.lower()
     final_scheme = urlparse(final_resp.url).scheme.lower()
-    result.https_upgrade = initial_scheme != "http" or final_scheme == "https"
 
-    if initial_scheme == "http" and final_scheme == "https":
-        # find first http → https transition
-        for idx, resp in enumerate(chain[:-1]):
-            if (
-                urlparse(resp.url).scheme.lower() == "http"
-                and urlparse(chain[idx + 1].url).scheme.lower() == "https"
-            ):
-                result.upgrade_step = idx
-                break
-        if result.upgrade_step and result.upgrade_step > 0:
+    if result.https_downgrade:
+        result.warnings.append(
+            f"SECURITY RISK: HTTPS to HTTP downgrade detected at step {result.downgrade_step}."
+        )
+
+    if result.https_upgrade:
+        if result.upgrade_step is not None and result.upgrade_step > 0:
             result.warnings.append(
-                "HTTPS upgrade occurred after the first redirect "
-                "(sub‑optimal chain)."
+                "HTTPS upgrade occurred after the first redirect (sub-optimal chain)."
             )
-    elif initial_scheme == "https":
-        result.upgrade_step = None
-    else:
+    elif initial_scheme == "http" and final_scheme == "http":
         result.warnings.append(
             "No HTTPS upgrade – the entire chain remained over HTTP."
         )
@@ -270,8 +262,7 @@ def track_redirects(url: str, *, verify_ssl: bool = True, redact: bool = False, 
 # --------------------------------------------------------------------------- #
 
 def print_human(result: TraceResult) -> None:
-    """Print a human‑friendly summary of *result*."""
-
+    """Print the trace result in a human-readable format."""
     print(f"Initial URL: {result.initial_url}")
 
     if not result.redirects:
@@ -280,27 +271,35 @@ def print_human(result: TraceResult) -> None:
         print("Redirect chain:")
         for i, step in enumerate(result.redirects, 1):
             print(f"{i}. {step.from_url} -> {step.status.code} {step.status.code_msg}")
-            print(f"   ↳ {step.to_url}\n")
-            print(f"   Request headers: {json.dumps(step.request_headers, indent=2)}\n")
-            print(f"   Response headers: {json.dumps(step.response_headers, indent=2)}\n")
+            print(f"    ↳ {step.to_url}")
+            print(f"    Request headers: {json.dumps(step.request_headers, indent=2)}")
+            print(f"    Response headers: {json.dumps(step.response_headers, indent=2)}")
+            print() # Blank line for readability
 
     if result.final_status:
         print(
             f"Final URL: {result.final_url} -> "
-            f"{result.final_status.code} {result.final_status.code_msg}\n"
+            f"{result.final_status.code} {result.final_status.code_msg}"
         )
+        print()
 
     if result.final_headers:
         print(
             f"Final response headers: "
-            f"{json.dumps(result.final_headers, indent=2)}\n"
+            f"{json.dumps(result.final_headers, indent=2)}"
         )
+        print()
 
     for warning in result.warnings:
         print(f"Warning: {warning}")
 
-    if result.https_upgrade and not result.warnings:
-        print("HTTPS upgrade confirmed or already secure.")
+    # Print a final "good" status message only if no warnings were generated
+    if not result.warnings and result.success:
+        if result.https_upgrade:
+            print("HTTPS upgrade confirmed (optimal chain).")
+        else:
+            # This covers https -> https (no redirect) and https -> https (redirects)
+            print("Connection confirmed secure (HTTPS).")
 
 
 def print_json(result: TraceResult) -> None:
@@ -308,12 +307,11 @@ def print_json(result: TraceResult) -> None:
     print(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
 
 # --------------------------------------------------------------------------- #
-# Command‑line interface
+# Command-line interface
 # --------------------------------------------------------------------------- #
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse command‑line arguments."""
-
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Trace HTTP redirects for a given URL."
     )
@@ -346,24 +344,31 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Redact sensitive headers (safe for sharing).",
     )
 
+    parser.add_argument(
+        "-t",
+        "--timeout",
+        type=float,
+        default=10.0,
+        help="Request timeout in seconds (default: 10.0).",
+    )
+
     return parser.parse_args(argv)
 
 def main(argv: list[str] | None = None) -> int:
-    """Entry point for the script."""
-
+    """Main script entry point."""
     args = parse_args(argv)
 
     parsed = urlparse(args.url)
 
     if not parsed.scheme or not parsed.netloc:
-        print(f"Invalid URL: {args.url}")
-
+        print(f"Invalid URL: {args.url}", file=sys.stderr)
         return 1
 
     result = track_redirects(
         args.url,
         verify_ssl=not args.insecure,
         redact=args.redact_headers,
+        timeout=args.timeout,
     )
 
     if args.json:
