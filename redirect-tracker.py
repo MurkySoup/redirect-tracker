@@ -10,10 +10,9 @@ and optionally emit structured JSON output. Includes header inspection,
 with optional redaction of sensitive header fields.
 
 Example:
-    python redirect_tracker.py -u "http://example.com"
-    python redirect_tracker.py -u "http://example.com" --json
-    python redirect_tracker.py -u "http://example.com" --json --redact-headers
-    python redirect_tracker.py -u "https://example.com" --downgrade-fatal
+# ./redirect_tracker.py -u "http://example.com"
+# ./redirect_tracker.py -u "http://example.com" --json
+# ./redirect_tracker.py -u "http://example.com" --json --redact-headers
 
 Linter: ruff check redirect-tracker.py --extend-select F,B,UP
 """
